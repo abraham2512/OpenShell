@@ -126,7 +126,17 @@ pub struct PodmanComputeConfig {
     /// `template.driver_config`.
     #[serde(default)]
     pub enable_bind_mounts: bool,
+    /// Health check interval in seconds for sandbox containers.
+    ///
+    /// Podman runs the health check command at this interval to determine
+    /// container readiness. Lower values detect readiness faster but
+    /// increase process churn (each check spawns a conmon subprocess).
+    /// Set to `0` to disable health checks entirely.
+    /// Defaults to [`DEFAULT_HEALTH_CHECK_INTERVAL_SECS`] (10 seconds).
+    pub health_check_interval_secs: u64,
 }
+
+pub const DEFAULT_HEALTH_CHECK_INTERVAL_SECS: u64 = 10;
 
 impl PodmanComputeConfig {
     /// Returns `true` when all three TLS paths are configured.
@@ -251,6 +261,7 @@ impl Default for PodmanComputeConfig {
             guest_tls_key: None,
             sandbox_pids_limit: DEFAULT_SANDBOX_PIDS_LIMIT,
             enable_bind_mounts: false,
+            health_check_interval_secs: DEFAULT_HEALTH_CHECK_INTERVAL_SECS,
         }
     }
 }
@@ -273,6 +284,10 @@ impl std::fmt::Debug for PodmanComputeConfig {
             .field("guest_tls_key", &self.guest_tls_key)
             .field("sandbox_pids_limit", &self.sandbox_pids_limit)
             .field("enable_bind_mounts", &self.enable_bind_mounts)
+            .field(
+                "health_check_interval_secs",
+                &self.health_check_interval_secs,
+            )
             .finish()
     }
 }
@@ -312,6 +327,15 @@ mod tests {
                 PathBuf::from(format!("/run/user/{uid}/podman/podman.sock"))
             );
         });
+    }
+
+    #[test]
+    fn default_config_sets_health_check_interval() {
+        let cfg = PodmanComputeConfig::default();
+        assert_eq!(
+            cfg.health_check_interval_secs,
+            DEFAULT_HEALTH_CHECK_INTERVAL_SECS
+        );
     }
 
     #[test]
