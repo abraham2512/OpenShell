@@ -3,10 +3,13 @@
 
 //! Gateway-owned compute orchestration over a pluggable compute backend.
 
+pub mod driver_config;
 pub mod lease;
 pub mod vm;
 
 pub use openshell_driver_docker::DockerComputeConfig;
+pub use openshell_driver_kubernetes::KubernetesComputeConfig;
+pub use openshell_driver_podman::PodmanComputeConfig;
 pub use vm::VmComputeConfig;
 
 use crate::grpc::policy::SANDBOX_SETTINGS_OBJECT_TYPE;
@@ -33,11 +36,9 @@ use openshell_core::proto::{
 };
 use openshell_driver_docker::DockerComputeDriver;
 use openshell_driver_kubernetes::{
-    ComputeDriverService, KubernetesComputeConfig, KubernetesComputeDriver,
+    ComputeDriverService as KubernetesDriverService, KubernetesComputeDriver,
 };
-use openshell_driver_podman::{
-    ComputeDriverService as PodmanDriverService, PodmanComputeConfig, PodmanComputeDriver,
-};
+use openshell_driver_podman::{ComputeDriverService as PodmanDriverService, PodmanComputeDriver};
 use prost::Message;
 use std::fmt;
 use std::net::SocketAddr;
@@ -292,7 +293,6 @@ impl ComputeRuntime {
         sandbox_watch_bus: SandboxWatchBus,
         tracing_log_bus: TracingLogBus,
         supervisor_sessions: Arc<SupervisorSessionRegistry>,
-        _allows_loopback_endpoints: bool,
         gateway_bind_addresses: Vec<SocketAddr>,
     ) -> Result<Self, ComputeError> {
         let capabilities = driver
@@ -365,7 +365,6 @@ impl ComputeRuntime {
             sandbox_watch_bus,
             tracing_log_bus,
             supervisor_sessions,
-            true,
             gateway_bind_addresses,
         )
         .await
@@ -382,7 +381,7 @@ impl ComputeRuntime {
         let driver = KubernetesComputeDriver::new(config)
             .await
             .map_err(|err| ComputeError::Message(err.to_string()))?;
-        let driver: SharedComputeDriver = Arc::new(ComputeDriverService::new(driver));
+        let driver: SharedComputeDriver = Arc::new(KubernetesDriverService::new(driver));
         Self::from_driver(
             ComputeDriverKind::Kubernetes.as_str().to_string(),
             driver,
@@ -394,7 +393,6 @@ impl ComputeRuntime {
             sandbox_watch_bus,
             tracing_log_bus,
             supervisor_sessions,
-            false,
             Vec::new(),
         )
         .await
@@ -420,7 +418,6 @@ impl ComputeRuntime {
             sandbox_watch_bus,
             tracing_log_bus,
             supervisor_sessions,
-            true,
             Vec::new(),
         )
         .await
@@ -449,7 +446,6 @@ impl ComputeRuntime {
             sandbox_watch_bus,
             tracing_log_bus,
             supervisor_sessions,
-            true,
             Vec::new(),
         )
         .await
